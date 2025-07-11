@@ -2,12 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Saner AI Chatbot</title>
+  <title>Smarter AI Chatbot</title>
   <script type="module">
     import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.10.0';
 
     let generator;
-    let conversationHistory = '';
+    let conversationHistory = "";
+
+    // System prompt helps steer behavior
+    const systemPrompt = "You are a helpful, friendly, and funny assistant. Answer clearly, avoid repeating the user.";
 
     window.addEventListener('DOMContentLoaded', async () => {
       const status = document.getElementById('status');
@@ -15,43 +18,49 @@
       const input = document.getElementById('user-input');
       const button = document.getElementById('submit');
 
-      status.textContent = 'Loading model... please wait';
-
-      // Load the text generation pipeline
+      status.textContent = 'Loading model... (can take 10–30 sec)';
       generator = await pipeline('text-generation', 'Xenova/distilgpt2');
-      status.textContent = 'Model ready! Start chatting.';
+      status.textContent = 'Ready! Ask me anything.';
 
       button.addEventListener('click', async () => {
         const userMessage = input.value.trim();
         if (!userMessage) return;
         input.value = '';
-        
+
         output.innerHTML += `<p><b>You:</b> ${userMessage}</p>`;
-        status.textContent = 'Bot is thinking...';
+        status.textContent = 'Thinking...';
 
-        // Add user message to conversation context
-        conversationHistory += `User: ${userMessage}\nBot:`;
+        // Format prompt with history
+        const prompt = `${systemPrompt}\n${conversationHistory}User: ${userMessage}\nBot:`;
 
-        const result = await generator(conversationHistory, {
-          max_new_tokens: 50,
+        const result = await generator(prompt, {
+          max_new_tokens: 60,
           temperature: 0.8,
           top_k: 50,
-          repetition_penalty: 1.2
+          repetition_penalty: 1.25
         });
 
-        // Extract bot reply
-        let reply = result[0].generated_text.replace(conversationHistory, '').split('\n')[0].trim();
-        reply = reply.replace(/[^a-zA-Z0-9.,?!'"()\- ]/g, ''); // remove weird characters
+        let reply = result[0].generated_text.replace(prompt, '').trim();
 
-        // Show reply
+        // Sanitize the response
+        reply = reply
+          .split('\n')[0]                           // only first line
+          .replace(/[^a-zA-Z0-9.,?!'"()\s\-]/g, '') // remove emojis and weird symbols
+          .replace(/(.)\1{4,}/g, '$1')              // limit character spam
+          .replace(/(.*)\1{1,}/, '$1');             // remove repeated phrases
+
+        // Avoid exact echo
+        if (reply.toLowerCase() === userMessage.toLowerCase()) {
+          reply = "Haha, I won't just repeat you!";
+        }
+
         output.innerHTML += `<p><b>Bot:</b> ${reply}</p>`;
         status.textContent = 'Ready!';
 
-        // Update context
-        conversationHistory += ` ${reply}\n`;
+        // Update convo history
+        conversationHistory += `User: ${userMessage}\nBot: ${reply}\n`;
       });
 
-      // Pressing enter submits the message
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') button.click();
       });
@@ -59,7 +68,7 @@
   </script>
 </head>
 <body style="font-family: sans-serif; padding: 2em;">
-  <h2>🧠 Saner AI Chatbot (DistilGPT2)</h2>
+  <h2>🤖 AI Chatbot (Now Less Dumb)</h2>
   <div id="status">Initializing...</div>
   <div id="output" style="margin: 1em 0; background: #f0f0f0; padding: 1em; border-radius: 8px; min-height: 100px;"></div>
   <input id="user-input" type="text" style="width: 70%;" placeholder="Say something..." />
