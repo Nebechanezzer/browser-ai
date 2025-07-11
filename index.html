@@ -2,19 +2,20 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Smart In-Browser AI (WebLLM)</title>
+  <title>Smart In-Browser AI Chatbot (WebLLM)</title>
   <script src="https://mlc.ai/web-llm/dist/index.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2em; max-width: 800px; margin: auto; }
     .chat-box { background: #f0f0f0; padding: 1em; border-radius: 10px; margin-top: 1em; min-height: 100px; }
     input, button { padding: 0.5em; font-size: 1em; }
+    input { width: 70%; }
   </style>
 </head>
 <body>
-  <h2>🤖 Smart AI Chatbot (WebLLM - Mistral/LLaMA2)</h2>
-  <div id="status">Loading model...</div>
+  <h2>🤖 Smarter AI Chatbot (Mistral via WebLLM)</h2>
+  <div id="status">Loading model... (this may take 20–30 seconds)</div>
   <div id="chat" class="chat-box"></div>
-  <input id="user-input" type="text" placeholder="Ask me anything..." style="width: 70%;" />
+  <input id="user-input" type="text" placeholder="Ask something..." />
   <button id="send">Send</button>
 
   <script>
@@ -27,7 +28,13 @@
     async function loadModel() {
       model = await webllm.CreateChatInstance();
       await model.reload("Mistral-7B-Instruct-v0.1-q4f16_1");
-      status.textContent = "Ready! Type a question.";
+
+      // Add a system prompt to guide the AI's behavior
+      await model.resetChat();
+      await model.chat.addMessage("system", 
+        "You are a helpful, polite, and concise assistant. Stay on topic. Avoid nonsense, hallucinations, and weird made-up stories. Be factual and helpful.");
+
+      status.textContent = "Ready! Ask anything.";
     }
 
     loadModel();
@@ -35,13 +42,26 @@
     button.addEventListener("click", async () => {
       const msg = input.value.trim();
       if (!msg) return;
-      input.value = "";
+      input.value = '';
       chatElem.innerHTML += `<p><b>You:</b> ${msg}</p>`;
       status.textContent = "Thinking...";
 
-      const reply = await model.chat.completion(msg);
-      chatElem.innerHTML += `<p><b>Bot:</b> ${reply}</p>`;
-      status.textContent = "Ready!";
+      try {
+        const reply = await model.chat.completion(msg);
+
+        // Simple hallucination filter — can be expanded
+        const nonsense = /(kickstarter|humble|she'd be alive|these two people don't exist|production|monkeys|banana factory)/i;
+        const finalReply = nonsense.test(reply)
+          ? "Sorry, that response got a little off track. Try rephrasing your question!"
+          : reply;
+
+        chatElem.innerHTML += `<p><b>Bot:</b> ${finalReply}</p>`;
+        status.textContent = "Ready!";
+      } catch (err) {
+        console.error(err);
+        chatElem.innerHTML += `<p><b>Bot:</b> Something went wrong. Try again later.</p>`;
+        status.textContent = "Error loading response.";
+      }
     });
 
     input.addEventListener("keydown", (e) => {
