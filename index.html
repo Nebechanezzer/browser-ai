@@ -1,77 +1,52 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>Smarter AI Chatbot</title>
-  <script type="module">
-    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.10.0';
+  <title>Smart In-Browser AI (WebLLM)</title>
+  <script src="https://mlc.ai/web-llm/dist/index.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 2em; max-width: 800px; margin: auto; }
+    .chat-box { background: #f0f0f0; padding: 1em; border-radius: 10px; margin-top: 1em; min-height: 100px; }
+    input, button { padding: 0.5em; font-size: 1em; }
+  </style>
+</head>
+<body>
+  <h2>🤖 Smart AI Chatbot (WebLLM - Mistral/LLaMA2)</h2>
+  <div id="status">Loading model...</div>
+  <div id="chat" class="chat-box"></div>
+  <input id="user-input" type="text" placeholder="Ask me anything..." style="width: 70%;" />
+  <button id="send">Send</button>
 
-    let generator;
-    let conversationHistory = "";
+  <script>
+    let chatElem = document.getElementById("chat");
+    let input = document.getElementById("user-input");
+    let button = document.getElementById("send");
+    let status = document.getElementById("status");
+    let model;
 
-    // System prompt helps steer behavior
-    const systemPrompt = "You are a helpful, friendly, and funny assistant. Answer clearly, avoid repeating the user.";
+    async function loadModel() {
+      model = await webllm.CreateChatInstance();
+      await model.reload("Mistral-7B-Instruct-v0.1-q4f16_1");
+      status.textContent = "Ready! Type a question.";
+    }
 
-    window.addEventListener('DOMContentLoaded', async () => {
-      const status = document.getElementById('status');
-      const output = document.getElementById('output');
-      const input = document.getElementById('user-input');
-      const button = document.getElementById('submit');
+    loadModel();
 
-      status.textContent = 'Loading model... (can take 10–30 sec)';
-      generator = await pipeline('text-generation', 'Xenova/distilgpt2');
-      status.textContent = 'Ready! Ask me anything.';
+    button.addEventListener("click", async () => {
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = "";
+      chatElem.innerHTML += `<p><b>You:</b> ${msg}</p>`;
+      status.textContent = "Thinking...";
 
-      button.addEventListener('click', async () => {
-        const userMessage = input.value.trim();
-        if (!userMessage) return;
-        input.value = '';
+      const reply = await model.chat.completion(msg);
+      chatElem.innerHTML += `<p><b>Bot:</b> ${reply}</p>`;
+      status.textContent = "Ready!";
+    });
 
-        output.innerHTML += `<p><b>You:</b> ${userMessage}</p>`;
-        status.textContent = 'Thinking...';
-
-        // Format prompt with history
-        const prompt = `${systemPrompt}\n${conversationHistory}User: ${userMessage}\nBot:`;
-
-        const result = await generator(prompt, {
-          max_new_tokens: 60,
-          temperature: 0.8,
-          top_k: 50,
-          repetition_penalty: 1.25
-        });
-
-        let reply = result[0].generated_text.replace(prompt, '').trim();
-
-        // Sanitize the response
-        reply = reply
-          .split('\n')[0]                           // only first line
-          .replace(/[^a-zA-Z0-9.,?!'"()\s\-]/g, '') // remove emojis and weird symbols
-          .replace(/(.)\1{4,}/g, '$1')              // limit character spam
-          .replace(/(.*)\1{1,}/, '$1');             // remove repeated phrases
-
-        // Avoid exact echo
-        if (reply.toLowerCase() === userMessage.toLowerCase()) {
-          reply = "Haha, I won't just repeat you!";
-        }
-
-        output.innerHTML += `<p><b>Bot:</b> ${reply}</p>`;
-        status.textContent = 'Ready!';
-
-        // Update convo history
-        conversationHistory += `User: ${userMessage}\nBot: ${reply}\n`;
-      });
-
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') button.click();
-      });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") button.click();
     });
   </script>
-</head>
-<body style="font-family: sans-serif; padding: 2em;">
-  <h2>🤖 AI Chatbot (Now Less Dumb)</h2>
-  <div id="status">Initializing...</div>
-  <div id="output" style="margin: 1em 0; background: #f0f0f0; padding: 1em; border-radius: 8px; min-height: 100px;"></div>
-  <input id="user-input" type="text" style="width: 70%;" placeholder="Say something..." />
-  <button id="submit">Send</button>
 </body>
 </html>
