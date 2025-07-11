@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Browser AI Chatbot</title>
+  <title>Saner AI Chatbot</title>
   <script type="module">
     import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.10.0';
 
     let generator;
+    let conversationHistory = '';
 
     window.addEventListener('DOMContentLoaded', async () => {
       const status = document.getElementById('status');
@@ -14,35 +15,54 @@
       const input = document.getElementById('user-input');
       const button = document.getElementById('submit');
 
-      status.textContent = 'Loading model...';
+      status.textContent = 'Loading model... please wait';
 
-      // Load text-generation model
+      // Load the text generation pipeline
       generator = await pipeline('text-generation', 'Xenova/distilgpt2');
-
-      status.textContent = 'Model ready! Type something below.';
+      status.textContent = 'Model ready! Start chatting.';
 
       button.addEventListener('click', async () => {
-        const text = input.value;
+        const userMessage = input.value.trim();
+        if (!userMessage) return;
         input.value = '';
-        output.innerHTML += `<p><b>You:</b> ${text}</p>`;
-        status.textContent = 'Thinking...';
+        
+        output.innerHTML += `<p><b>You:</b> ${userMessage}</p>`;
+        status.textContent = 'Bot is thinking...';
 
-        const result = await generator(text, {
+        // Add user message to conversation context
+        conversationHistory += `User: ${userMessage}\nBot:`;
+
+        const result = await generator(conversationHistory, {
           max_new_tokens: 50,
-          temperature: 0.7
+          temperature: 0.8,
+          top_k: 50,
+          repetition_penalty: 1.2
         });
 
-        output.innerHTML += `<p><b>Bot:</b> ${result[0].generated_text}</p>`;
+        // Extract bot reply
+        let reply = result[0].generated_text.replace(conversationHistory, '').split('\n')[0].trim();
+        reply = reply.replace(/[^a-zA-Z0-9.,?!'"()\- ]/g, ''); // remove weird characters
+
+        // Show reply
+        output.innerHTML += `<p><b>Bot:</b> ${reply}</p>`;
         status.textContent = 'Ready!';
+
+        // Update context
+        conversationHistory += ` ${reply}\n`;
+      });
+
+      // Pressing enter submits the message
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') button.click();
       });
     });
   </script>
 </head>
 <body style="font-family: sans-serif; padding: 2em;">
-  <h2>🧠 Local AI Chatbot (DistilGPT2)</h2>
+  <h2>🧠 Saner AI Chatbot (DistilGPT2)</h2>
   <div id="status">Initializing...</div>
-  <div id="output" style="margin: 1em 0; background: #f0f0f0; padding: 1em; border-radius: 8px;"></div>
-  <input id="user-input" type="text" style="width: 70%;" placeholder="Type your message..." />
+  <div id="output" style="margin: 1em 0; background: #f0f0f0; padding: 1em; border-radius: 8px; min-height: 100px;"></div>
+  <input id="user-input" type="text" style="width: 70%;" placeholder="Say something..." />
   <button id="submit">Send</button>
 </body>
 </html>
