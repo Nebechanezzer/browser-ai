@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Browser AI Chatbot</title>
+  <script type="module">
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.10.0';
+
+    let generator;
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const status = document.getElementById('status');
+      const output = document.getElementById('output');
+      const input = document.getElementById('user-input');
+      const button = document.getElementById('submit');
+
+      status.textContent = 'Loading model...';
+
+      // Load text-generation model
+      generator = await pipeline('text-generation', 'Xenova/distilgpt2');
+
+      status.textContent = 'Model ready! Type something below.';
+
+      button.addEventListener('click', async () => {
+        const text = input.value;
+        input.value = '';
+        output.innerHTML += `<p><b>You:</b> ${text}</p>`;
+        status.textContent = 'Thinking...';
+
+        const result = await generator(text, {
+          max_new_tokens: 50,
+          temperature: 0.7
+        });
+
+        output.innerHTML += `<p><b>Bot:</b> ${result[0].generated_text}</p>`;
+        status.textContent = 'Ready!';
+      });
+    });
+  </script>
+</head>
+<body style="font-family: sans-serif; padding: 2em;">
+  <h2>🧠 Local AI Chatbot (DistilGPT2)</h2>
+  <div id="status">Initializing...</div>
+  <div id="output" style="margin: 1em 0; background: #f0f0f0; padding: 1em; border-radius: 8px;"></div>
+  <input id="user-input" type="text" style="width: 70%;" placeholder="Type your message..." />
+  <button id="submit">Send</button>
+</body>
+</html>
