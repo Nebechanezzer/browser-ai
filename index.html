@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Smart In-Browser AI Chatbot (WebLLM)</title>
+  <title>Smarter WebLLM Chatbot</title>
   <script src="https://mlc.ai/web-llm/dist/index.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2em; max-width: 800px; margin: auto; }
@@ -12,8 +12,8 @@
   </style>
 </head>
 <body>
-  <h2>🤖 Smarter AI Chatbot (Mistral via WebLLM)</h2>
-  <div id="status">Loading model... (this may take 20–30 seconds)</div>
+  <h2>🤖 WebLLM Smart Chatbot</h2>
+  <div id="status">Loading model... (20–30 seconds)</div>
   <div id="chat" class="chat-box"></div>
   <input id="user-input" type="text" placeholder="Ask something..." />
   <button id="send">Send</button>
@@ -29,12 +29,12 @@
       model = await webllm.CreateChatInstance();
       await model.reload("Mistral-7B-Instruct-v0.1-q4f16_1");
 
-      // Add a system prompt to guide the AI's behavior
+      // Inject a stricter system prompt
       await model.resetChat();
       await model.chat.addMessage("system", 
-        "You are a helpful, polite, and concise assistant. Stay on topic. Avoid nonsense, hallucinations, and weird made-up stories. Be factual and helpful.");
+        "You are a helpful, factual, and concise AI assistant. Do not invent people or stories. Never claim to be human. Keep answers clear, accurate, and on-topic. If unsure, say so briefly.");
 
-      status.textContent = "Ready! Ask anything.";
+      status.textContent = "✅ Ready! Ask a question.";
     }
 
     loadModel();
@@ -44,24 +44,50 @@
       if (!msg) return;
       input.value = '';
       chatElem.innerHTML += `<p><b>You:</b> ${msg}</p>`;
-      status.textContent = "Thinking...";
+      status.textContent = "🤔 Thinking...";
 
-      try {
-        const reply = await model.chat.completion(msg);
+      let reply = '';
 
-        // Simple hallucination filter — can be expanded
-        const nonsense = /(kickstarter|humble|she'd be alive|these two people don't exist|production|monkeys|banana factory)/i;
-        const finalReply = nonsense.test(reply)
-          ? "Sorry, that response got a little off track. Try rephrasing your question!"
-          : reply;
+      // Check for identity-related questions
+      const identityChecks = [
+        "are you human", "are you a person", "are you real", "who are you",
+        "what are you", "are you an ai", "are you sentient"
+      ];
 
-        chatElem.innerHTML += `<p><b>Bot:</b> ${finalReply}</p>`;
-        status.textContent = "Ready!";
-      } catch (err) {
-        console.error(err);
-        chatElem.innerHTML += `<p><b>Bot:</b> Something went wrong. Try again later.</p>`;
-        status.textContent = "Error loading response.";
+      const isIdentityQuestion = identityChecks.some(q => msg.toLowerCase().includes(q));
+      if (isIdentityQuestion) {
+        reply = "I'm an AI assistant — not a human — designed to help with questions and tasks.";
       }
+
+      // Check for basic math question
+      else if (/^\s*(what('|’)?s|what is)?\s*\d+\s*[\+\-\*\/]\s*\d+\s*\??$/i.test(msg)) {
+        try {
+          const mathExpr = msg.match(/(\d+\s*[\+\-\*\/]\s*\d+)/)[0];
+          const result = Function(`"use strict"; return (${mathExpr})`)();
+          reply = `${mathExpr.trim()} = ${result}`;
+        } catch {
+          reply = "Sorry, I couldn't calculate that.";
+        }
+      }
+
+      // Otherwise use the AI model
+      else {
+        try {
+          reply = await model.chat.completion(msg);
+
+          // Filter common hallucinated patterns
+          const nonsense = /(kickstarter|humble|banana factory|production|monkeys|he was a member of|this year's event|my friend from)/i;
+          if (nonsense.test(reply)) {
+            reply = "Hmm... that went off topic. Try asking it another way.";
+          }
+        } catch (err) {
+          console.error(err);
+          reply = "Sorry, something went wrong getting a response.";
+        }
+      }
+
+      chatElem.innerHTML += `<p><b>Bot:</b> ${reply}</p>`;
+      status.textContent = "✅ Ready!";
     });
 
     input.addEventListener("keydown", (e) => {
